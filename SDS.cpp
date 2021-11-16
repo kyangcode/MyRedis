@@ -1,5 +1,4 @@
 #include "SDS.h"
-#include <cstring>
 
 namespace std
 {
@@ -12,7 +11,7 @@ namespace std
 	{
 		len = s.length();
 		buf = new char[len + 1]{};
-		strcpy(buf, str);
+		strcpy(buf, s.c_str());
 	}
 	
 	SDS::SDS(const SDS &sds)
@@ -33,7 +32,7 @@ namespace std
 		size_t bufSize = 0;
 		if (newLen > SDS_MAX_PREALLOC)
 		{
-			bufSize = newLen + SDS_MAX_PREALLOC + 1
+			bufSize = newLen + SDS_MAX_PREALLOC + 1;
 		}
 		else
 		{
@@ -49,7 +48,7 @@ namespace std
 		free = bufSize - len - 1;	
 	}
 
-	size_t SDS::len() const
+	size_t SDS::size() const
 	{
 		return len;
 	}
@@ -86,7 +85,7 @@ namespace std
 	
 	SDS& SDS::catSDS(const SDS &sds)
 	{
-		size_t strLen = sds.len();
+		size_t strLen = sds.size();
 		if (strLen == 0)
 		{
 			return *this;
@@ -106,7 +105,7 @@ namespace std
 
 	SDS& SDS::cpy(const SDS &sds)
 	{
-		size_t strLen = sds.len();
+		size_t strLen = sds.size();
 		if (strLen > free + len)		
 		{
 			 makeRoomFor(strLen); 			
@@ -120,35 +119,49 @@ namespace std
 	
 	bool SDS::cmp(const SDS &sds) const
 	{
-		if (len != sds.len)
-		{
-			return false;
-		}
+		if (len != sds.len) return false;
 		return memcmp(buf, sds.buf, len) == 0;		
 	}
 	
-	SDS& SDS::trim(const char *str)
+	SDS& SDS::trim(const string &s)
 	{
+		if (s.empty()) return *this;
+
 		size_t left = 0;
 		size_t right = len - 1;
-		while (left <= right && strchr(str, buf[left])) left++;
-		while (right >= left && strchr(str, buf[right])) right--;
+		while (left <= right && s.find(buf[left]) != string::npos) left++;
+		while (right >= left && s.find(buf[right]) != string::npos) right--;
 
 		size_t newLen = left > right ? 0 : right - left + 1;
 		memmove(buf, buf + left, newLen);
 		free += len - newLen;
+		len = newLen;
 		return *this;
 	}
 	
 	void SDS::range(size_t start, size_t end)
 	{
-		if (start < 0) start = len + start;
-		if (end < 0) end = len + end;
+		if (start < 0) 
+		{
+			start = len + start;
+			if (start < 0)
+			{
+				start = 0;
+			}
+		}
+		if (end < 0)
+		{
+			end = len + end;
+			if (end >= len)
+			{
+				end = len - 1;
+			}
+		}
 
-		memmove(buf, buf + start, end - start);				
-		free = len - (end - start);
-		len = end - start;
-		return *this;
+		size_t newLen = end - start + 1;
+		memmove(buf, buf + start, newLen);				
+		free += len - newLen;
+		len = newLen;
 	}
 
 	SDS& SDS::growZero(size_t newLen)
@@ -163,11 +176,8 @@ namespace std
 			makeRoomFor(newLen);
 		}
 		
-		for (int i = len; i < newLen; i++)
-		{
-			buf[i] = '\0';
-		}
-		free = free - (newLen - len);
+		memset(buf + len + 1, 0, newLen - len);
+		free -= newLen - len;
 		len = newLen;
 		return *this;		
 	}
@@ -176,3 +186,11 @@ namespace std
 	{
 		return *(new SDS(sds));
 	}
+	
+	ostream &operator<<(ostream &out, const SDS &sds)
+	{
+		out << "len:" << sds.size() << " free:"<< sds.avail() << " buf:" << sds.buf;
+		return out;
+	}
+
+}
